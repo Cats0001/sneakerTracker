@@ -2,7 +2,7 @@ from api import getItem
 import pickle
 
 class item:
-    def __init__(self, stockx, size, initial):
+    def __init__(self, stockx, size, initial, fee):
         if not initial:
             self.data = getItem(stockx)
             self.stockx = stockx
@@ -13,30 +13,37 @@ class item:
                 self.size = size
 
             self.value = self.data['sizes'][self.size]['price']
-            self.getPayout()
+            self.getPayout(fee)
         else:
             self.stockx = stockx
             self.size = size
 
-    def refresh(self, data):
+    def refresh(self, data, fee):
         if data is not None:
             self.data = data
         else:
             self.data = getItem(self.stockx)
         self.value = self.data['sizes'][self.size]['price']
-        self.getPayout()
+        self.getPayout(fee)
         return self.data
 
-    def getPayout(self):
-        self.payout = round(self.value*0.915, 2)  # hardcoded 8.5% for now
+    def getPayout(self, fee):
+        self.payout = round(self.value*fee, 2)  # hardcoded 8.5% for now
 
 
 class itemList:
     def __init__(self):
         self.data = []
+        self.stockx_seller_levels = {
+            '1': 0.905,
+            '2': 0.91,
+            '3': 0.915,
+            '4': 0.92
+        }
+        self.seller_level = self.stockx_seller_levels['1']
 
     def add(self, stockx, size, initial):
-        self.data.append(item(stockx, size, initial))
+        self.data.append(item(stockx, size, initial, self.seller_level))
 
     def listItems(self):
         i=1
@@ -59,9 +66,9 @@ class itemList:
         }
         for product in self.data:
             if product.stockx in cache:
-                d = product.refresh(cache[product.stockx])
+                d = product.refresh(cache[product.stockx], self.seller_level)
             else:
-                d = product.refresh(None)
+                d = product.refresh(None, self.seller_level)
             print(f'[{i}] refreshed')
             cache[product.stockx] = d
             i+=1
@@ -83,6 +90,10 @@ class itemList:
             self.add(product[0], product[1], True)
         self.refreshAll()
 
+    def changeSellerLevel(self, level):
+        self.seller_level = self.stockx_seller_levels[level]
+        self.refreshAll()
+
     def remove(self, indice):
         self.data.pop(indice)
 
@@ -91,7 +102,7 @@ items = itemList()
 items.load()
 
 while True:
-    inp = input("(a)dd, (l)ist, (r)efresh, (d)elete, (e)xit:  ").lower()
+    inp = input("(a)dd, (l)ist, (r)efresh, (d)elete, (s)ettings, (e)xit:  ").lower()
     if inp == 'a':
         inp = input("stockX URL:  ").lower()
         inp2 = input("size:   ").lower()
@@ -105,6 +116,9 @@ while True:
         inp = input("item:   ")
         items.remove(int(inp)-1)
         items.save()
+    elif inp == 's':
+        inp = input("new level:   ").lower()
+        items.changeSellerLevel(inp)
     elif inp == 'e':
         items.save()
         exit(0)
